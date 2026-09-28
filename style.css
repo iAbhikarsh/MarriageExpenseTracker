@@ -17,6 +17,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
@@ -39,12 +40,18 @@ button { cursor: pointer; }
 .topbar-actions, .auth-controls { display: flex; align-items: center; gap: 12px; }
 .auth-controls { gap: 9px; }
 .auth-user { max-width: 190px; overflow: hidden; color: #68736c; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.email-mark { color: var(--green); font-size: 14px; font-weight: 700; }
-.auth-message { min-height: 34px; margin: -7px 0 16px; color: #68736c; font-size: 12px; line-height: 1.5; }
-.auth-dialog-actions { justify-content: space-between; }
-.auth-dialog-actions .text-button { text-align: left; }
-.password-reset { margin-top: 9px; }
-.auth-cancel { width: 100%; margin-top: 15px; }
+.auth-screen { display: grid; min-height: 100vh; place-items: center; padding: 24px; }
+.auth-panel { width: min(100%, 390px); padding: 30px; border: 1px solid var(--line); background: var(--paper); }
+.auth-brand { margin: 0 0 31px; color: var(--ink); }
+.auth-brand .brand-mark { border-color: #aab9a7; color: var(--green); }
+.auth-brand small { color: var(--muted); }
+.auth-panel h1 { margin: 0 0 10px; font-family: var(--serif); font-size: 27px; font-weight: 500; }
+.auth-message { min-height: 34px; margin: 0 0 18px; color: #68736c; font-size: 12px; line-height: 1.5; }
+.auth-panel form { display: grid; gap: 14px; }
+.auth-panel .field { margin: 0; }
+.auth-submit { width: 100%; margin-top: 3px; }
+.auth-links { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; }
+.auth-signout { width: 100%; margin-top: 16px; }
 .eyebrow { margin: 0 0 7px; color: #8d7560; font-size: 9px; font-weight: 700; letter-spacing: 1.2px; }
 .primary-button, .secondary-button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 42px; padding: 0 17px; border: 1px solid var(--green); border-radius: 3px; background: var(--green); color: white; font-size: 12px; font-weight: 600; transition: background 150ms ease, transform 150ms ease; }
 .primary-button:hover { background: var(--green-dark); transform: translateY(-1px); }
@@ -191,7 +198,7 @@ td.actions { width: 92px; text-align: right; white-space: nowrap; }
   .topbar-actions { gap: 7px; }
   .auth-controls { flex-wrap: wrap; justify-content: end; gap: 4px 7px; }
   .auth-user { max-width: 120px; }
-  #emailSignInButton { min-height: 36px; padding: 0 9px; font-size: 10px; }
+  .auth-panel { padding: 24px; }
   .top-add { min-height: 34px; padding: 0 11px; font-size: 10px; }
   .page { padding-top: 23px; }
   .welcome-row { align-items: flex-start; flex-direction: column; gap: 14px; }

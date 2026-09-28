@@ -13,11 +13,32 @@
   <script src="script.js" defer></script>
 </head>
 <body>
-  <div class="app-shell">
+  <main class="auth-screen" id="authScreen">
+    <section class="auth-panel" aria-labelledby="authTitle">
+      <a class="brand auth-brand" href="#" aria-label="Marriage Expense Tracker">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <span><strong>Marriage Expense Tracker</strong><small>Marriage budget</small></span>
+      </a>
+      <p class="eyebrow">PRIVATE CELEBRATION PLANNER</p>
+      <h1 id="authTitle">Sign in</h1>
+      <p class="auth-message" id="authMessage" role="status" aria-live="polite">Sign in with your email address and password.</p>
+      <form id="emailAuthForm">
+        <div class="field"><label for="authEmail">Email</label><input id="authEmail" type="email" autocomplete="username" required></div>
+        <div class="field"><label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="current-password" minlength="6" required></div>
+        <button class="primary-button auth-submit" id="authSubmit" type="submit">Sign in</button>
+      </form>
+      <div class="auth-links">
+        <button class="text-button" id="switchAuthMode" type="button">Create an account</button>
+        <button class="text-button" id="passwordReset" type="button">Forgot password?</button>
+      </div>
+      <button class="secondary-button auth-signout" id="authSignOutButton" type="button" hidden>Sign out</button>
+    </section>
+  </main>
+  <div class="app-shell" id="appShell" hidden>
     <aside class="sidebar">
       <a class="brand" href="#dashboard" aria-label="Marriage Expense Tracker dashboard">
         <span class="brand-mark" aria-hidden="true">M</span>
-        <span><strong>Gather & Co.</strong><small>Marriage budget</small></span>
+        <span><strong>Marriage Expense Tracker</strong><small>Marriage budget</small></span>
       </a>
       <nav class="main-nav" aria-label="Main navigation">
         <button class="nav-link active" type="button" data-page="dashboard"><span class="nav-icon" aria-hidden="true">◫</span>Overview</button>
@@ -40,7 +61,6 @@
         <div class="topbar-actions">
           <div class="auth-controls" aria-label="Account">
             <span class="auth-user" id="authUser" hidden></span>
-            <button class="secondary-button" id="emailSignInButton" type="button" aria-haspopup="dialog"><span class="email-mark" aria-hidden="true">@</span>Sign in</button>
             <button class="text-button" id="signOutButton" type="button" hidden>Sign out</button>
           </div>
           <button class="primary-button top-add" type="button" data-go="addExpense"><span aria-hidden="true">＋</span> Add expense</button>
@@ -149,17 +169,6 @@
       <div class="field"><label for="editAmount">Amount</label><div class="amount-input"><span>₹</span><input id="editAmount" type="number" min="0.01" step="0.01" required></div></div>
       <div class="field"><label for="editNotes">Note <span class="optional">Optional</span></label><textarea id="editNotes" rows="2" maxlength="240"></textarea></div>
       <div class="dialog-actions"><button class="secondary-button" id="cancelEdit" type="button">Cancel</button><button class="primary-button" type="submit">Save changes</button></div>
-    </form>
-  </dialog>
-  <dialog id="emailAuthDialog" class="edit-dialog" aria-labelledby="emailAuthTitle">
-    <form id="emailAuthForm">
-      <div class="section-heading"><div><p class="eyebrow">SECURE SIGN-IN</p><h2 id="emailAuthTitle">Sign in</h2></div><button class="dialog-close" type="button" id="closeEmailAuth" aria-label="Close">×</button></div>
-      <p class="auth-message" id="authMessage" role="status" aria-live="polite">Sign in with your email address and password.</p>
-      <div class="field"><label for="authEmail">Email</label><input id="authEmail" type="email" autocomplete="username" required></div>
-      <div class="field"><label for="authPassword">Password</label><input id="authPassword" type="password" autocomplete="current-password" minlength="6" required></div>
-      <div class="dialog-actions auth-dialog-actions"><button class="text-button" id="switchAuthMode" type="button">Create an account</button><button class="primary-button" id="authSubmit" type="submit">Sign in</button></div>
-      <button class="text-button password-reset" id="passwordReset" type="button">Forgot password?</button>
-      <button class="secondary-button auth-cancel" id="cancelEmailAuth" type="button">Cancel</button>
     </form>
   </dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
