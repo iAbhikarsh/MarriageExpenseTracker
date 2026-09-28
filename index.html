@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f2ec">
+  <title>Marriage Expense Tracker</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://www.gstatic.com/firebasejs/10.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.6.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#dashboard" aria-label="Marriage Expense Tracker dashboard">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <span><strong>Gather & Co.</strong><small>Marriage budget</small></span>
+      </a>
+      <nav class="main-nav" aria-label="Main navigation">
+        <button class="nav-link active" type="button" data-page="dashboard"><span class="nav-icon" aria-hidden="true">◫</span>Overview</button>
+        <button class="nav-link" type="button" data-page="addExpense"><span class="nav-icon" aria-hidden="true">＋</span>Add expense</button>
+        <button class="nav-link" type="button" data-page="expenseRecords"><span class="nav-icon" aria-hidden="true">▤</span>Expense records</button>
+        <button class="nav-link" type="button" data-page="categories"><span class="nav-icon" aria-hidden="true">⌑</span>Categories</button>
+      </nav>
+      <div class="sidebar-note">
+        <span class="note-dot" aria-hidden="true"></span>
+        <span>Every detail, in one place.</span>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">THE CELEBRATION, WELL PLANNED</p>
+          <h1 id="pageTitle">Overview</h1>
+        </div>
+        <button class="primary-button top-add" type="button" data-go="addExpense"><span aria-hidden="true">＋</span> Add expense</button>
+      </header>
+      <div class="firebase-status" id="firebaseStatus" role="status" aria-live="polite">Connecting to Firebase...</div>
+
+      <section class="page active" id="dashboard" aria-labelledby="pageTitle">
+        <div class="welcome-row">
+          <div>
+            <h2>Your celebration at a glance</h2>
+            <p>Keep the planning clear, from the first booking to the final detail.</p>
+          </div>
+          <form class="budget-form" id="budgetForm">
+            <label for="budgetInput">Total budget</label>
+            <div class="budget-control"><span>₹</span><input id="budgetInput" type="number" min="0" step="1000" aria-label="Total budget in rupees"><button type="submit" aria-label="Save total budget" title="Save budget">Save</button></div>
+          </form>
+        </div>
+
+        <div class="stat-grid" aria-live="polite">
+          <article class="stat-card stat-budget"><span class="stat-label">Total budget</span><strong id="totalBudget">₹0</strong><span class="stat-foot">Your planned celebration spend</span></article>
+          <article class="stat-card stat-spent"><span class="stat-label">Total spent</span><strong id="totalSpent">₹0</strong><span class="stat-foot" id="expenseCount">Across 0 expenses</span></article>
+          <article class="stat-card stat-remaining"><span class="stat-label">Budget remaining</span><strong id="budgetRemaining">₹0</strong><span class="stat-foot" id="budgetMessage">Set a budget to get started</span></article>
+        </div>
+
+        <div class="dashboard-grid">
+          <section class="panel budget-panel" aria-labelledby="budgetHeading">
+            <div class="section-heading"><div><p class="eyebrow">BUDGET PICTURE</p><h2 id="budgetHeading">Budget breakdown</h2></div><span class="small-label" id="budgetPercent">0% used</span></div>
+            <div class="budget-chart" id="budgetChart" role="img" aria-label="Budget chart: no budget set">
+              <div class="budget-pie" id="budgetPie" aria-hidden="true"></div>
+              <div class="chart-legend" aria-hidden="true">
+                <div class="chart-legend-row"><span class="legend-swatch spent-swatch"></span><span>Amount spent</span><strong id="chartSpent">₹0</strong></div>
+                <div class="chart-legend-row"><span class="legend-swatch remaining-swatch"></span><span>Amount left</span><strong id="chartRemaining">₹0</strong></div>
+              </div>
+            </div>
+            <div class="budget-callout"><span class="callout-mark" aria-hidden="true">✳</span><p id="budgetTip">Add your budget and first expense to see your progress.</p></div>
+          </section>
+          <section class="panel category-panel" aria-labelledby="categorySummaryTitle">
+            <div class="section-heading"><div><p class="eyebrow">WHERE IT GOES</p><h2 id="categorySummaryTitle">Category summary</h2></div><button class="text-button" type="button" data-go="categories">Manage categories <span aria-hidden="true">→</span></button></div>
+            <div id="categorySummary" class="category-summary"></div>
+          </section>
+        </div>
+
+        <section class="panel recent-panel" aria-labelledby="recentTitle">
+          <div class="section-heading"><div><p class="eyebrow">LATEST ACTIVITY</p><h2 id="recentTitle">Recent expenses</h2></div><button class="text-button" type="button" data-go="expenseRecords">All records <span aria-hidden="true">→</span></button></div>
+          <div class="recent-list" id="recentExpenses"></div>
+        </section>
+      </section>
+
+      <section class="page" id="addExpense" aria-labelledby="addTitle" hidden>
+        <div class="form-layout">
+          <div class="page-intro"><p class="eyebrow">ADD TO THE PLAN</p><h2 id="addTitle">Record an expense</h2><p>Bookings, outfits, travel, little finishing touches. Add them as they happen.</p></div>
+          <form class="panel expense-form" id="expenseForm">
+            <div class="form-grid">
+              <div class="field"><label for="date">Date</label><input id="date" type="date" required></div>
+              <div class="field"><label for="name">Expense name</label><input id="name" type="text" maxlength="100" placeholder="e.g. Floral stage deposit" required></div>
+              <div class="field"><label for="category">Category</label><div class="select-with-action"><select id="category" required></select><button class="inline-add" type="button" data-go="categories" aria-label="Create a category" title="Create a category">＋</button></div></div>
+              <div class="field"><label for="amount">Amount</label><div class="amount-input"><span>₹</span><input id="amount" type="number" min="0.01" step="0.01" placeholder="0.00" required></div></div>
+              <div class="field field-wide"><label for="notes">Note <span class="optional">Optional</span></label><textarea id="notes" rows="3" maxlength="240" placeholder="Payment details or a reminder"></textarea></div>
+            </div>
+            <div class="form-actions"><p>Synced to your marriage tracker.</p><button class="primary-button" type="submit">Save expense <span aria-hidden="true">→</span></button></div>
+          </form>
+        </div>
+      </section>
+
+      <section class="page" id="expenseRecords" aria-labelledby="recordsTitle" hidden>
+        <div class="page-intro records-intro"><div><p class="eyebrow">YOUR SPENDING, ITEM BY ITEM</p><h2 id="recordsTitle">Expense records</h2></div><p>Filter, review, or update recorded expenses.</p></div>
+        <section class="panel records-panel">
+          <div class="filter-row">
+            <label class="filter-field" for="expenseFilter"><span>Category</span><select id="expenseFilter"></select></label>
+            <label class="filter-field" for="dateFilter"><span>Date</span><input id="dateFilter" type="date"></label>
+            <button class="text-button clear-filters" id="clearFilters" type="button">Clear filters</button>
+            <span class="record-total" id="filteredTotal">₹0 total</span>
+          </div>
+          <div class="table-wrap"><table id="expenseTable"><thead><tr><th>Date</th><th>Expense</th><th>Category</th><th>Note</th><th class="amount-col">Amount</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody></tbody></table></div>
+          <div class="empty-state" id="recordsEmpty" hidden><span aria-hidden="true">✳</span><p>No expenses match yet.</p><button class="text-button" type="button" data-go="addExpense">Add your first expense →</button></div>
+        </section>
+      </section>
+
+      <section class="page" id="categories" aria-labelledby="categoriesTitle" hidden>
+        <div class="page-intro"><p class="eyebrow">MAKE IT YOURS</p><h2 id="categoriesTitle">Expense categories</h2><p>Add the categories that make sense for your celebration. They appear in the expense form and filters.</p></div>
+        <div class="category-layout">
+          <form class="panel category-form" id="categoryForm">
+            <p class="eyebrow">NEW CATEGORY</p><h3>Create a category</h3>
+            <label class="sr-only" for="newCategory">Category name</label><input id="newCategory" type="text" maxlength="40" placeholder="e.g. Mehendi" required>
+            <button class="primary-button" type="submit">Add category <span aria-hidden="true">＋</span></button>
+            <p class="form-hint" id="categoryHint">Categories can be up to 40 characters.</p>
+          </form>
+          <section class="panel category-list-panel" aria-labelledby="categoryListTitle">
+            <div class="section-heading"><div><p class="eyebrow">YOUR LIST</p><h2 id="categoryListTitle">Categories</h2></div><span class="count-pill" id="categoryCount">0</span></div>
+            <ul class="category-list" id="categoryList"></ul>
+          </section>
+        </div>
+      </section>
+      <footer class="app-footer"><span>Marriage Expense Tracker</span><span>Made for the moments that matter.</span></footer>
+    </main>
+  </div>
+
+  <dialog id="editDialog" class="edit-dialog" aria-labelledby="editTitle">
+    <form id="editForm" method="dialog">
+      <div class="section-heading"><div><p class="eyebrow">UPDATE RECORD</p><h2 id="editTitle">Edit expense</h2></div><button class="dialog-close" type="button" id="closeDialog" aria-label="Close">×</button></div>
+      <input id="editId" type="hidden">
+      <div class="field"><label for="editDate">Date</label><input id="editDate" type="date" required></div>
+      <div class="field"><label for="editName">Expense name</label><input id="editName" type="text" maxlength="100" required></div>
+      <div class="field"><label for="editCategory">Category</label><select id="editCategory" required></select></div>
+      <div class="field"><label for="editAmount">Amount</label><div class="amount-input"><span>₹</span><input id="editAmount" type="number" min="0.01" step="0.01" required></div></div>
+      <div class="field"><label for="editNotes">Note <span class="optional">Optional</span></label><textarea id="editNotes" rows="2" maxlength="240"></textarea></div>
+      <div class="dialog-actions"><button class="secondary-button" id="cancelEdit" type="button">Cancel</button><button class="primary-button" type="submit">Save changes</button></div>
+    </form>
+  </dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
