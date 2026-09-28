@@ -1,14 +1,19 @@
 const DEFAULT_CATEGORIES = ['Venue', 'Catering', 'Decor', 'Photography', 'Attire', 'Jewelry', 'Travel', 'Gifts', 'Other'];
 const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
 const pages = ['dashboard', 'addExpense', 'expenseRecords', 'categories'];
-const db = firebase.firestore();
-const expenseCollection = db.collection('marriage_expenses');
-const categoryCollection = db.collection('marriage_categories');
-const settingsCollection = db.collection('marriage_settings');
-let categories = [];
+const firebaseInitialized = typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0 && typeof firebase.firestore === 'function';
+const db = firebaseInitialized ? firebase.firestore() : null;
+const auth = firebaseInitialized && typeof firebase.auth === 'function' ? firebase.auth() : null;
+const expenseCollection = db ? db.collection('marriage_expenses') : null;
+const categoryCollection = db ? db.collection('marriage_categories') : null;
+const settingsCollection = db ? db.collection('marriage_settings') : null;
+const userCollection = db ? db.collection('marriage_users') : null;
+let categories = [...DEFAULT_CATEGORIES];
 let expenses = [];
 let budget = 0;
 let firebaseReady = false;
+let currentUser = null;
+let authMode = 'signIn';
 let toastTimer;
 
 const elements = {
@@ -35,6 +40,15 @@ const elements = {
   recordsEmpty: document.getElementById('recordsEmpty'),
   filteredTotal: document.getElementById('filteredTotal'),
   firebaseStatus: document.getElementById('firebaseStatus'),
+  authUser: document.getElementById('authUser'),
+  emailSignInButton: document.getElementById('emailSignInButton'),
+  signOutButton: document.getElementById('signOutButton'),
+  emailAuthDialog: document.getElementById('emailAuthDialog'),
+  authMessage: document.getElementById('authMessage'),
+  authEmail: document.getElementById('authEmail'),
+  authPassword: document.getElementById('authPassword'),
+  authSubmit: document.getElementById('authSubmit'),
+  switchAuthMode: document.getElementById('switchAuthMode'),
   toast: document.getElementById('toast')
 };
 
@@ -45,17 +59,68 @@ function categoryDocumentId(name) {
 function showFirebaseError(error) {
   console.error('Marriage tracker Firebase error:', error);
   elements.firebaseStatus.hidden = false;
-  elements.firebaseStatus.textContent = 'Firebase could not be accessed. Check that Firestore is enabled and its security rules allow this app to read and write the marriage collections.';
+  elements.firebaseStatus.textContent = error.code === 'permission-denied' && currentUser
+    ? `Signed in, but Firestore rules do not allow UID ${currentUser.uid}. Add this UID to the marriage collection allowlist.`
+    : 'Firebase could not be accessed. Check that Firestore is enabled and its security rules allow this app to read and write the marriage collections.';
+}
+
+function emailAuthErrorMessage(error) {
+  const messages = {
+    'auth/email-already-in-use': 'An account already exists for this email. Sign in instead.',
+    'auth/invalid-email': 'Enter a valid email address.',
+    'auth/weak-password': 'Choose a password with at least 6 characters.',
+    'auth/invalid-credential': 'Email or password is incorrect.',
+    'auth/user-not-found': 'No account exists for this email. Create an account first.',
+    'auth/wrong-password': 'Email or password is incorrect.',
+    'auth/too-many-requests': 'Too many attempts. Wait a while before trying again.',
+    'auth/operation-not-allowed': 'Enable Email/Password sign-in in Firebase Authentication.'
+  };
+  return messages[error.code] || 'Could not complete authentication. Check your details and Firebase Authentication settings.';
+}
+
+function showAuthMode(mode) {
+  authMode = mode;
+  const creatingAccount = mode === 'create';
+  document.getElementById('emailAuthTitle').textContent = creatingAccount ? 'Create account' : 'Sign in';
+  elements.authSubmit.textContent = creatingAccount ? 'Create account' : 'Sign in';
+  elements.switchAuthMode.textContent = creatingAccount ? 'I already have an account' : 'Create an account';
+  elements.authMessage.textContent = creatingAccount
+    ? 'Use your email address and a password of at least 6 characters.'
+    : 'Sign in with your email address and password.';
+}
+
+function resetEmailAuthDialog() {
+  document.getElementById('emailAuthForm').reset();
+  showAuthMode('signIn');
 }
 
 async function loadTrackerData() {
+  if (!db) {
+    elements.firebaseStatus.textContent = 'Firebase is not initialized. Check that the Firebase SDKs and firebase-config.js loaded successfully.';
+    return;
+  }
+  if (!currentUser) return;
+
+  firebaseReady = false;
+  elements.firebaseStatus.hidden = false;
+  elements.firebaseStatus.textContent = 'Loading your marriage tracker...';
+  const userRef = userCollection.doc(currentUser.uid);
   const budgetRef = settingsCollection.doc('budget');
   try {
-    const [budgetSnapshot, categorySnapshot, expenseSnapshot] = await Promise.all([
+    const [userSnapshot, budgetSnapshot, categorySnapshot, expenseSnapshot] = await Promise.all([
+      userRef.get(),
       budgetRef.get(),
       categoryCollection.get(),
       expenseCollection.get()
     ]);
+
+    if (!userSnapshot.exists) {
+      await userRef.set({
+        username: currentUser.email,
+        email: currentUser.email,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
 
     if (categorySnapshot.empty) {
       const batch = db.batch();
@@ -455,7 +520,88 @@ document.getElementById('clearFilters').addEventListener('click', () => {
   renderRecords();
 });
 
+elements.emailSignInButton.addEventListener('click', () => {
+  if (!auth) return showToast('Firebase Authentication is not available.');
+  showAuthMode('signIn');
+  elements.emailAuthDialog.showModal();
+});
+
+document.getElementById('emailAuthForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!auth) return;
+  const email = elements.authEmail.value.trim();
+  const password = elements.authPassword.value;
+  try {
+    if (authMode === 'create') await auth.createUserWithEmailAndPassword(email, password);
+    else await auth.signInWithEmailAndPassword(email, password);
+    elements.emailAuthDialog.close();
+    resetEmailAuthDialog();
+  } catch (error) {
+    elements.authMessage.textContent = emailAuthErrorMessage(error);
+  }
+});
+
+elements.switchAuthMode.addEventListener('click', () => {
+  showAuthMode(authMode === 'signIn' ? 'create' : 'signIn');
+});
+
+document.getElementById('passwordReset').addEventListener('click', async () => {
+  const email = elements.authEmail.value.trim();
+  if (!email) {
+    elements.authMessage.textContent = 'Enter your email address first, then choose Forgot password.';
+    elements.authEmail.focus();
+    return;
+  }
+  try {
+    await auth.sendPasswordResetEmail(email);
+    elements.authMessage.textContent = 'Password reset email sent. Check your inbox.';
+  } catch (error) {
+    elements.authMessage.textContent = emailAuthErrorMessage(error);
+  }
+});
+
+document.getElementById('closeEmailAuth').addEventListener('click', () => {
+  elements.emailAuthDialog.close();
+  resetEmailAuthDialog();
+});
+document.getElementById('cancelEmailAuth').addEventListener('click', () => {
+  elements.emailAuthDialog.close();
+  resetEmailAuthDialog();
+});
+
+elements.signOutButton.addEventListener('click', async () => {
+  try {
+    await auth.signOut();
+  } catch (error) {
+    showFirebaseError(error);
+  }
+});
+
 document.getElementById('date').value = localDateValue();
 refresh();
 showPage('dashboard');
-loadTrackerData();
+
+if (!auth) {
+  elements.firebaseStatus.textContent = 'Firebase Authentication is not initialized. Check the SDK and Firebase config.';
+} else {
+  auth.onAuthStateChanged(user => {
+    currentUser = user;
+    firebaseReady = false;
+    elements.emailSignInButton.hidden = Boolean(user);
+    elements.signOutButton.hidden = !user;
+    elements.authUser.hidden = !user;
+    elements.authUser.textContent = user ? user.email || 'Signed in' : '';
+
+    if (user) {
+      loadTrackerData();
+      return;
+    }
+
+    categories = [...DEFAULT_CATEGORIES];
+    expenses = [];
+    budget = 0;
+    elements.firebaseStatus.hidden = false;
+    elements.firebaseStatus.textContent = 'Sign in with an approved account to load your tracker.';
+    refresh();
+  }, showFirebaseError);
+}

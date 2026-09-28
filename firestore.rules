@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isMarriageTrackerUser() {
+      return request.auth != null
+        && request.auth.uid in [
+          'REPLACE_WITH_FIRST_ALLOWED_UID'
+        ];
+    }
+
+    match /marriage_expenses/{documentId} {
+      allow read, write: if isMarriageTrackerUser();
+    }
+
+    match /marriage_categories/{documentId} {
+      allow read, write: if isMarriageTrackerUser();
+    }
+
+    match /marriage_settings/{documentId} {
+      allow read, write: if isMarriageTrackerUser();
+    }
+
+    match /marriage_users/{userId} {
+      allow read: if isMarriageTrackerUser() && request.auth.uid == userId;
+      allow create: if isMarriageTrackerUser()
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['username', 'email', 'createdAt'])
+        && request.resource.data.username == request.auth.token.email
+        && request.resource.data.email == request.auth.token.email;
+      allow update, delete: if false;
+    }
+  }
+}
