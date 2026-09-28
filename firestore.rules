@@ -4,7 +4,7 @@ service cloud.firestore {
     function isMarriageTrackerUser() {
       return request.auth != null
         && request.auth.uid in [
-          'hHl3NpKTPQXEwUSD8utsLFzmOJP2'
+          'REPLACE_WITH_FIRST_ALLOWED_UID'
         ];
     }
 
