@@ -74,6 +74,10 @@ function showFirebaseError(error) {
     : 'Firebase could not be accessed. Check that Firestore is enabled and its security rules allow this app to read and write the marriage collections.';
 }
 
+function clearFirebaseStatus() {
+  elements.firebaseStatus.hidden = true;
+}
+
 function emailAuthErrorMessage(error) {
   const messages = {
     'auth/email-already-in-use': 'An account already exists for this email. Sign in instead.',
@@ -406,6 +410,7 @@ async function deleteExpense(id) {
   try {
     await expenseCollection.doc(id).delete();
     expenses = expenses.filter(expense => expense.id !== id);
+    clearFirebaseStatus();
     showToast('Expense deleted.');
   } catch (error) {
     showFirebaseError(error);
@@ -422,6 +427,7 @@ async function removeCategory(category) {
   try {
     await categoryCollection.doc(categoryDocumentId(category)).delete();
     categories = categories.filter(item => item !== category);
+    clearFirebaseStatus();
     showToast('Category removed.');
   } catch (error) {
     showFirebaseError(error);
@@ -440,6 +446,7 @@ document.getElementById('budgetForm').addEventListener('submit', async event => 
   try {
     await settingsCollection.doc('budget').set({ amount: nextBudget, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
     budget = nextBudget;
+    clearFirebaseStatus();
     showToast('Budget updated.');
     renderDashboard();
   } catch (error) {
@@ -461,6 +468,7 @@ document.getElementById('expenseForm').addEventListener('submit', async event =>
   try {
     const expenseDocument = await expenseCollection.add(expense);
     expenses = [...expenses, { ...expense, id: expenseDocument.id, createdAt: Date.now() }];
+    clearFirebaseStatus();
     event.currentTarget.reset();
     document.getElementById('date').value = localDateValue();
     showToast('Expense added.');
@@ -485,6 +493,7 @@ document.getElementById('categoryForm').addEventListener('submit', async event =
   try {
     await categoryCollection.doc(categoryDocumentId(value)).set({ name: value, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
     categories = [...categories, value];
+    clearFirebaseStatus();
     input.value = '';
     document.getElementById('categoryHint').textContent = 'Categories can be up to 40 characters.';
     showToast(`${value} category added.`);
@@ -510,6 +519,7 @@ document.getElementById('editForm').addEventListener('submit', async event => {
   try {
     await expenseCollection.doc(id).update(updatedExpense);
     expenses = expenses.map(expense => expense.id === id ? { ...expense, ...updatedExpense } : expense);
+    clearFirebaseStatus();
     document.getElementById('editDialog').close();
     showToast('Expense updated.');
     refresh();
