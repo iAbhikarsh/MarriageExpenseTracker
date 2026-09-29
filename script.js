@@ -82,6 +82,7 @@ function emailAuthErrorMessage(error) {
     'auth/email-already-in-use': 'An account already exists for this email. Sign in instead.',
     'auth/invalid-email': 'Enter a valid email address.',
     'auth/weak-password': 'Choose a password with at least 6 characters.',
+    'auth/invalid-login-credentials': 'Email or password is incorrect. Check the address, or use Forgot password to reset it.',
     'auth/invalid-credential': 'Email or password is incorrect.',
     'auth/user-not-found': 'No account exists for this email. Create an account first.',
     'auth/wrong-password': 'Email or password is incorrect.',
