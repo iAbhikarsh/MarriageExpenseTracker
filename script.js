@@ -56,7 +56,7 @@ function categoryDocumentId(name) {
   return Array.from(name).map(character => character.codePointAt(0).toString(16)).join('_') || 'empty';
 }
 
-function showFirebaseError(error) {
+function showFirebaseError(error, action = 'Firebase request failed') {
   console.error('Marriage tracker Firebase error:', error);
   if (currentUser && !firebaseReady) {
     elements.authScreen.hidden = false;
@@ -67,10 +67,8 @@ function showFirebaseError(error) {
       : 'Could not load your tracker. Check the Firestore database and its rules, then try signing in again.';
     return;
   }
-  const message = error.code === 'permission-denied'
-    ? 'Firestore denied this action. Check the rules for the affected marriage collection.'
-    : 'Could not complete the Firebase action. Check your connection and try again.';
-  showToast(message);
+  const code = error && error.code ? ` (${error.code})` : '';
+  showToast(`${action}${code}.`);
 }
 
 function emailAuthErrorMessage(error) {
@@ -439,12 +437,13 @@ document.getElementById('budgetForm').addEventListener('submit', async event => 
     showToast('Budget updated.');
     renderDashboard();
   } catch (error) {
-    showFirebaseError(error);
+    showFirebaseError(error, 'Budget was not saved');
   }
 });
 
 document.getElementById('expenseForm').addEventListener('submit', async event => {
   event.preventDefault();
+  const expenseForm = event.currentTarget;
   if (!firebaseReady) return showToast('Waiting for the Firebase connection.');
   const expense = {
     date: document.getElementById('date').value,
@@ -457,13 +456,13 @@ document.getElementById('expenseForm').addEventListener('submit', async event =>
   try {
     const expenseDocument = await expenseCollection.add(expense);
     expenses = [...expenses, { ...expense, id: expenseDocument.id, createdAt: Date.now() }];
-    event.currentTarget.reset();
+    expenseForm.reset();
     document.getElementById('date').value = localDateValue();
     showToast('Expense saved successfully.');
     showPage('dashboard');
     refresh();
   } catch (error) {
-    showFirebaseError(error);
+    showFirebaseError(error, 'Expense was not saved');
   }
 });
 
