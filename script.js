@@ -437,33 +437,56 @@ function renderDashboard() {
       ? `Spending is ${formatMoney(Math.abs(remaining))} above the planned budget.`
       : `${formatMoney(remaining)} remains for the plans still to come.`;
 
-  const totals = categories.map(category => ({
+  const categoryNames = [...new Set([
+    ...categories,
+    ...plans.map(plan => plan.category),
+    ...expenses.map(expense => expense.category).filter(Boolean)
+  ])];
+  const totals = categoryNames.map(category => ({
     category,
-    total: expenses.filter(expense => expense.category === category).reduce((sum, expense) => sum + Number(expense.amount || 0), 0)
-  })).filter(item => item.total > 0).sort((a, b) => b.total - a.total);
+    planned: plans.filter(plan => plan.category === category).reduce((sum, plan) => sum + plan.amount, 0),
+    actual: expenses.filter(expense => expense.category === category).reduce((sum, expense) => sum + expense.amount, 0)
+  })).filter(item => item.planned > 0 || item.actual > 0)
+    .sort((a, b) => Math.max(b.planned, b.actual) - Math.max(a.planned, a.actual));
   elements.categorySummary.replaceChildren();
   if (!totals.length) {
     const empty = document.createElement('p');
     empty.className = 'summary-empty';
-    empty.textContent = 'Category totals will appear after you add an expense.';
+    empty.textContent = 'Category comparisons will appear after you add a plan or expense.';
     elements.categorySummary.append(empty);
   } else {
-    const max = totals[0].total;
+    const max = Math.max(...totals.map(item => Math.max(item.planned, item.actual)));
     totals.slice(0, 6).forEach(item => {
       const row = document.createElement('div');
       row.className = 'summary-row';
       const label = document.createElement('span');
       label.className = 'summary-name';
       label.textContent = item.category;
-      const bar = document.createElement('span');
-      bar.className = 'summary-bar';
-      const fill = document.createElement('span');
-      fill.style.width = `${(item.total / max) * 100}%`;
-      bar.append(fill);
-      const amount = document.createElement('span');
-      amount.className = 'summary-amount';
-      amount.textContent = formatMoney(item.total);
-      row.append(label, bar, amount);
+      const bars = document.createElement('div');
+      bars.className = 'summary-bars';
+      bars.setAttribute('aria-hidden', 'true');
+      const plannedBar = document.createElement('span');
+      plannedBar.className = 'summary-track planned-track';
+      const plannedFill = document.createElement('span');
+      plannedFill.style.width = `${(item.planned / max) * 100}%`;
+      plannedBar.append(plannedFill);
+      const actualBar = document.createElement('span');
+      actualBar.className = 'summary-track actual-track';
+      const actualFill = document.createElement('span');
+      actualFill.style.width = `${(item.actual / max) * 100}%`;
+      actualBar.append(actualFill);
+      bars.append(plannedBar, actualBar);
+      const amounts = document.createElement('span');
+      amounts.className = 'summary-amounts';
+      const plannedAmount = document.createElement('span');
+      plannedAmount.className = 'planned-amount';
+      plannedAmount.textContent = formatMoney(item.planned);
+      const actualAmount = document.createElement('span');
+      actualAmount.className = 'actual-amount';
+      actualAmount.textContent = formatMoney(item.actual);
+      amounts.append(plannedAmount, actualAmount);
+      row.setAttribute('aria-label', `${item.category}: planned ${formatMoney(item.planned)}, actual ${formatMoney(item.actual)}`);
+      row.append(label, bars, amounts);
       elements.categorySummary.append(row);
     });
   }

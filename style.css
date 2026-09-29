@@ -102,12 +102,22 @@ button { cursor: pointer; }
 .budget-callout p { margin: 0; color: #667068; font-size: 11px; line-height: 1.55; }
 .text-button { padding: 5px 0; border: 0; background: none; color: var(--green); font-size: 11px; font-weight: 700; }
 .text-button:hover { color: var(--coral); }
-.category-summary { display: grid; gap: 14px; margin-top: 21px; }
-.summary-row { display: grid; grid-template-columns: minmax(80px, .75fr) minmax(60px, 1fr) auto; align-items: center; gap: 10px; }
-.summary-name, .summary-amount { overflow: hidden; color: #606a63; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.summary-amount { color: var(--ink); text-align: right; font-weight: 600; }
-.summary-bar { height: 5px; overflow: hidden; background: #eef0e9; }
-.summary-bar span { display: block; height: 100%; background: #77917e; }
+.category-summary-legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 17px 0 12px; color: #77817a; font-size: 10px; }
+.category-summary-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.category-summary-legend i { width: 8px; height: 8px; border-radius: 50%; }
+.planned-key { background: #315e4d; }
+.actual-key { background: #c96f58; }
+.category-summary { display: grid; gap: 15px; }
+.summary-row { display: grid; grid-template-columns: minmax(72px, .65fr) minmax(70px, 1fr) minmax(118px, auto); align-items: center; gap: 12px; }
+.summary-name { overflow: hidden; color: #606a63; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.summary-bars { display: grid; gap: 5px; min-width: 0; }
+.summary-track { display: block; height: 5px; overflow: hidden; background: #eef0e9; }
+.summary-track span { display: block; height: 100%; min-width: 0; }
+.planned-track span { background: #315e4d; }
+.actual-track span { background: #c96f58; }
+.summary-amounts { display: grid; gap: 3px; color: #606a63; font-size: 9px; text-align: right; white-space: nowrap; }
+.planned-amount { color: #315e4d; }
+.actual-amount { color: #b65f4b; }
 .summary-empty, .recent-empty { color: #8b928c; font-size: 11px; }
 .recent-list { display: grid; margin-top: 13px; }
 .recent-item { display: grid; grid-template-columns: minmax(100px, 1.1fr) minmax(75px, 1fr) auto; align-items: center; gap: 12px; min-height: 45px; border-top: 1px solid #eeede7; }
