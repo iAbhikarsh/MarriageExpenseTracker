@@ -1,6 +1,6 @@
 const DEFAULT_CATEGORIES = ['Venue', 'Catering', 'Decor', 'Photography', 'Attire', 'Jewelry', 'Travel', 'Gifts', 'Other'];
 const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
-const pages = ['dashboard', 'addExpense', 'expenseRecords', 'categories'];
+const pages = ['dashboard', 'expensePlan', 'addExpense', 'expenseRecords', 'categories'];
 const firebaseInitialized = typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0 && typeof firebase.firestore === 'function';
 const db = firebaseInitialized ? firebase.firestore() : null;
 const auth = firebaseInitialized && typeof firebase.auth === 'function' ? firebase.auth() : null;
@@ -8,13 +8,17 @@ const expenseCollection = db ? db.collection('marriage_expenses') : null;
 const categoryCollection = db ? db.collection('marriage_categories') : null;
 const settingsCollection = db ? db.collection('marriage_settings') : null;
 const userCollection = db ? db.collection('marriage_users') : null;
+const planCollection = db ? db.collection('marriage_plans') : null;
 let categories = [...DEFAULT_CATEGORIES];
 let expenses = [];
+let plans = [];
 let budget = 0;
 let firebaseReady = false;
 let currentUser = null;
 let currentUserProfile = null;
 let canEditData = false;
+let editingPlanCategory = null;
+let plannedActualChart = null;
 let authMode = 'signIn';
 let toastTimer;
 
@@ -38,6 +42,20 @@ const elements = {
   editCategory: document.getElementById('editCategory'),
   categoryList: document.getElementById('categoryList'),
   categoryCount: document.getElementById('categoryCount'),
+  planCategory: document.getElementById('planCategory'),
+  planAmount: document.getElementById('planAmount'),
+  planForm: document.getElementById('planForm'),
+  planFormTitle: document.getElementById('planFormTitle'),
+  planSubmit: document.getElementById('planSubmit'),
+  cancelPlanEdit: document.getElementById('cancelPlanEdit'),
+  planTableBody: document.getElementById('planTableBody'),
+  plansTableWrap: document.getElementById('plansTableWrap'),
+  planActionsHeader: document.getElementById('planActionsHeader'),
+  plansEmpty: document.getElementById('plansEmpty'),
+  planCount: document.getElementById('planCount'),
+  plannedTotal: document.getElementById('plannedTotal'),
+  plannedActualCanvas: document.getElementById('plannedActualChart'),
+  plannedActualEmpty: document.getElementById('plannedActualEmpty'),
   expenseTableBody: document.querySelector('#expenseTable tbody'),
   expenseActionsHeader: document.getElementById('expenseActionsHeader'),
   recordsEmpty: document.getElementById('recordsEmpty'),
@@ -144,10 +162,11 @@ async function loadTrackerData() {
 
     canEditData = currentUserProfile.role === 'editor';
     const budgetRef = settingsCollection.doc('budget');
-    const [budgetSnapshot, categorySnapshot, expenseSnapshot] = await Promise.all([
+    const [budgetSnapshot, categorySnapshot, expenseSnapshot, planSnapshot] = await Promise.all([
       budgetRef.get(),
       categoryCollection.get(),
-      expenseCollection.get()
+      expenseCollection.get(),
+      planCollection.get()
     ]);
 
     if (categorySnapshot.empty) {
@@ -186,6 +205,14 @@ async function loadTrackerData() {
           createdAt: data.createdAt && data.createdAt.toMillis ? data.createdAt.toMillis() : 0
         };
       });
+    plans = planSnapshot.docs.map(planDocument => {
+      const data = planDocument.data();
+      return {
+        id: planDocument.id,
+        category: data.category || planDocument.id,
+        amount: Number(data.amount) || 0
+      };
+    });
     firebaseReady = true;
     elements.authRole.hidden = false;
     elements.authRole.textContent = canEditData ? 'Editor' : 'Read only';
@@ -194,6 +221,7 @@ async function loadTrackerData() {
     elements.authScreen.hidden = true;
     elements.appShell.hidden = false;
     elements.signOutButton.hidden = false;
+    renderPlannedActualChart();
     if (!canEditData && (!budgetSnapshot.exists || categorySnapshot.empty)) {
       showToast('Some tracker setup is pending an editor account.');
     }
@@ -245,11 +273,17 @@ function showPage(pageId) {
   const activeLink = document.querySelector(`.nav-link[data-page="${pageId}"]`);
   document.getElementById('pageTitle').textContent = activeLink ? {
     dashboard: 'Overview',
+    expensePlan: 'Plan',
     addExpense: 'Add expense',
     expenseRecords: 'Expense records',
     categories: 'Categories'
   }[pageId] : 'Overview';
   if (pageId === 'expenseRecords') renderRecords();
+  if (pageId === 'expensePlan') {
+    renderPlanOptions();
+    renderPlanTable();
+  }
+  if (pageId === 'dashboard') renderPlannedActualChart();
 }
 
 function addOption(select, label, value) {
@@ -283,14 +317,98 @@ function renderCategoryOptions() {
     remove.textContent = 'Remove';
     remove.setAttribute('aria-label', `Remove ${category} category`);
     const isUsed = expenses.some(expense => expense.category === category);
+    const hasPlan = plans.some(plan => plan.category === category);
     remove.hidden = !canEditData;
-    remove.disabled = isUsed || !canEditData;
-    remove.title = isUsed ? 'This category is used by an expense' : `Remove ${category}`;
+    remove.disabled = isUsed || hasPlan || !canEditData;
+    remove.title = isUsed ? 'This category is used by an expense' : hasPlan ? 'Delete its planned amount first' : `Remove ${category}`;
     remove.addEventListener('click', () => removeCategory(category));
     item.append(name, remove);
     elements.categoryList.append(item);
   });
   elements.categoryCount.textContent = categories.length;
+}
+
+function renderPlanOptions() {
+  const selected = elements.planCategory.value;
+  const available = categories.filter(category =>
+    category === editingPlanCategory || !plans.some(plan => plan.category === category)
+  );
+  elements.planCategory.replaceChildren();
+  available.forEach(category => addOption(elements.planCategory, category, category));
+  if (available.includes(selected)) elements.planCategory.value = selected;
+  elements.planCategory.disabled = Boolean(editingPlanCategory) || available.length === 0;
+  elements.planSubmit.disabled = available.length === 0 && !editingPlanCategory;
+}
+
+function renderPlanTable() {
+  elements.planTableBody.replaceChildren();
+  [...plans].sort((a, b) => a.category.localeCompare(b.category)).forEach(plan => {
+    const row = document.createElement('tr');
+    const category = document.createElement('td');
+    category.textContent = plan.category;
+    const amount = document.createElement('td');
+    amount.className = 'amount-col';
+    amount.textContent = formatMoney(plan.amount);
+    const actions = document.createElement('td');
+    actions.className = 'actions';
+    if (canEditData) {
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'row-action';
+      edit.textContent = 'Edit';
+      edit.addEventListener('click', () => editPlan(plan));
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'row-action delete';
+      remove.textContent = 'Delete';
+      remove.addEventListener('click', () => deletePlan(plan));
+      actions.append(edit, remove);
+    } else {
+      actions.hidden = true;
+    }
+    row.append(category, amount, actions);
+    elements.planTableBody.append(row);
+  });
+  const total = plans.reduce((sum, plan) => sum + plan.amount, 0);
+  elements.plannedTotal.textContent = formatMoney(total);
+  elements.planCount.textContent = plans.length;
+  elements.plansTableWrap.hidden = plans.length === 0;
+  elements.plansEmpty.hidden = plans.length > 0;
+  elements.planActionsHeader.hidden = !canEditData;
+}
+
+function resetPlanForm() {
+  editingPlanCategory = null;
+  elements.planForm.reset();
+  elements.planFormTitle.textContent = 'Add a category plan';
+  elements.planSubmit.textContent = 'Add plan';
+  elements.cancelPlanEdit.hidden = true;
+  renderPlanOptions();
+}
+
+function editPlan(plan) {
+  if (!canEditData) return showToast('Your account has read-only access.');
+  editingPlanCategory = plan.category;
+  renderPlanOptions();
+  elements.planCategory.value = plan.category;
+  elements.planAmount.value = plan.amount;
+  elements.planFormTitle.textContent = 'Edit planned amount';
+  elements.planSubmit.textContent = 'Save changes';
+  elements.cancelPlanEdit.hidden = false;
+}
+
+async function deletePlan(plan) {
+  if (!canEditData) return showToast('Your account has read-only access.');
+  if (!window.confirm(`Delete the ${plan.category} planned amount?`)) return;
+  try {
+    await planCollection.doc(plan.id).delete();
+    plans = plans.filter(item => item.id !== plan.id);
+    if (editingPlanCategory === plan.category) resetPlanForm();
+    refresh();
+    showToast('Planned amount deleted.');
+  } catch (error) {
+    showFirebaseError(error, 'Planned amount was not deleted');
+  }
 }
 
 function renderDashboard() {
@@ -376,6 +494,76 @@ function renderDashboard() {
   }
 }
 
+function renderPlannedActualChart() {
+  const chartCategories = [...new Set([
+    ...categories,
+    ...plans.map(plan => plan.category),
+    ...expenses.map(expense => expense.category).filter(Boolean)
+  ])];
+  if (!chartCategories.length) {
+    elements.plannedActualCanvas.hidden = true;
+    elements.plannedActualEmpty.hidden = false;
+    return;
+  }
+  if (typeof Chart === 'undefined') {
+    elements.plannedActualCanvas.hidden = true;
+    elements.plannedActualEmpty.hidden = false;
+    elements.plannedActualEmpty.textContent = 'The planned-versus-actual chart could not load.';
+    return;
+  }
+
+  elements.plannedActualCanvas.hidden = false;
+  elements.plannedActualEmpty.hidden = true;
+  const plannedByCategory = new Map(plans.map(plan => [plan.category, plan.amount]));
+  const actualByCategory = new Map();
+  expenses.forEach(expense => {
+    actualByCategory.set(expense.category, (actualByCategory.get(expense.category) || 0) + expense.amount);
+  });
+  const datasets = [
+    {
+      label: 'Planned',
+      data: chartCategories.map(category => plannedByCategory.get(category) || 0),
+      borderColor: '#315e4d',
+      backgroundColor: '#315e4d',
+      tension: 0.25,
+      pointRadius: 3
+    },
+    {
+      label: 'Actual',
+      data: chartCategories.map(category => actualByCategory.get(category) || 0),
+      borderColor: '#c96f58',
+      backgroundColor: '#c96f58',
+      tension: 0.25,
+      pointRadius: 3
+    }
+  ];
+
+  if (plannedActualChart) {
+    plannedActualChart.data.labels = chartCategories;
+    plannedActualChart.data.datasets = datasets;
+    plannedActualChart.update();
+    return;
+  }
+
+  plannedActualChart = new Chart(elements.plannedActualCanvas.getContext('2d'), {
+    type: 'line',
+    data: { labels: chartCategories, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom' },
+        tooltip: { callbacks: { label: context => `${context.dataset.label}: ${formatMoney(context.parsed.y)}` } }
+      },
+      scales: {
+        y: { beginAtZero: true, ticks: { callback: value => formatMoney(value) } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+}
+
 function renderRecords() {
   const selectedCategory = elements.expenseFilter.value;
   const selectedDate = document.getElementById('dateFilter').value;
@@ -429,6 +617,7 @@ function applyAccessControls() {
   });
   document.getElementById('budgetForm').hidden = !canEditData;
   document.getElementById('categoryForm').hidden = !canEditData;
+  elements.planForm.hidden = !canEditData;
   elements.expenseActionsHeader.hidden = !canEditData;
   elements.authRole.hidden = !currentUserProfile;
   elements.authRole.textContent = canEditData ? 'Editor' : 'Read only';
@@ -436,9 +625,14 @@ function applyAccessControls() {
 
 function refresh() {
   renderCategoryOptions();
+  renderPlanOptions();
+  renderPlanTable();
   renderDashboard();
   renderRecords();
   elements.budgetInput.value = budget || '';
+  if (!elements.appShell.hidden && !document.getElementById('dashboard').hidden) {
+    renderPlannedActualChart();
+  }
 }
 
 function openEdit(expense) {
@@ -467,6 +661,10 @@ async function deleteExpense(id) {
 
 async function removeCategory(category) {
   if (!canEditData) return showToast('Your account has read-only access.');
+  if (plans.some(plan => plan.category === category)) {
+    showToast('Delete this category\'s planned amount first.');
+    return;
+  }
   if (expenses.some(expense => expense.category === category)) {
     showToast('Remove or recategorize its expenses first.');
     return;
@@ -552,6 +750,40 @@ document.getElementById('categoryForm').addEventListener('submit', async event =
     showFirebaseError(error);
   }
 });
+
+elements.planForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (!canEditData) return showToast('Your account has read-only access.');
+  if (!firebaseReady) return showToast('Waiting for the Firebase connection.');
+  const category = elements.planCategory.value;
+  const amount = Number(elements.planAmount.value);
+  if (!category || !Number.isFinite(amount) || amount <= 0) return;
+
+  const existing = plans.find(plan => plan.category === category);
+  if (!editingPlanCategory && existing) return showToast('A planned amount already exists for this category.');
+  const planId = existing ? existing.id : categoryDocumentId(category);
+  const plannedAmount = {
+    category,
+    amount,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+  if (!existing) plannedAmount.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+
+  try {
+    if (existing) await planCollection.doc(planId).update(plannedAmount);
+    else await planCollection.doc(planId).set(plannedAmount);
+    plans = existing
+      ? plans.map(plan => plan.id === planId ? { ...plan, category, amount } : plan)
+      : [...plans, { id: planId, category, amount }];
+    resetPlanForm();
+    refresh();
+    showToast(existing ? 'Planned amount updated.' : 'Planned amount added.');
+  } catch (error) {
+    showFirebaseError(error, 'Planned amount was not saved');
+  }
+});
+
+elements.cancelPlanEdit.addEventListener('click', () => resetPlanForm());
 
 document.getElementById('editForm').addEventListener('submit', async event => {
   event.preventDefault();

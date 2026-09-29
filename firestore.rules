@@ -35,6 +35,11 @@ service cloud.firestore {
       allow write: if isEditor();
     }
 
+    match /marriage_plans/{planId} {
+      allow read: if hasTrackerAccess();
+      allow write: if isEditor();
+    }
+
     match /marriage_users/{userId} {
       allow get: if isSignedIn() && request.auth.uid == userId;
       allow list, create, update, delete: if false;

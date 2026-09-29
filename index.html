@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f2ec">
   <title>Marriage Expense Tracker</title>
-  <link rel="stylesheet" href="style.css?v=auth-screen-2">
+  <link rel="stylesheet" href="style.css?v=plan-page-1">
   <script src="https://www.gstatic.com/firebasejs/10.6.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.6.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.6.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
   <script src="firebase-config.js"></script>
-  <script src="script.js?v=reader-editor-2" defer></script>
+  <script src="script.js?v=plan-page-1" defer></script>
 </head>
 <body>
   <main class="auth-screen" id="authScreen">
@@ -42,6 +43,7 @@
       </a>
       <nav class="main-nav" aria-label="Main navigation">
         <button class="nav-link active" type="button" data-page="dashboard"><span class="nav-icon" aria-hidden="true">◫</span>Overview</button>
+        <button class="nav-link" type="button" data-page="expensePlan"><span class="nav-icon" aria-hidden="true">◷</span>Plan</button>
         <button class="nav-link" type="button" data-page="addExpense"><span class="nav-icon" aria-hidden="true">＋</span>Add expense</button>
         <button class="nav-link" type="button" data-page="expenseRecords"><span class="nav-icon" aria-hidden="true">▤</span>Expense records</button>
         <button class="nav-link" type="button" data-page="categories"><span class="nav-icon" aria-hidden="true">⌑</span>Categories</button>
@@ -103,10 +105,32 @@
           </section>
         </div>
 
+        <section class="panel plan-chart-panel" aria-labelledby="plannedActualHeading">
+          <div class="section-heading"><div><p class="eyebrow">PLAN VS ACTUAL</p><h2 id="plannedActualHeading">Spend by category</h2></div></div>
+          <div class="planned-chart-wrap"><canvas id="plannedActualChart" role="img" aria-label="Line chart comparing planned and actual spending by category"></canvas><p class="summary-empty" id="plannedActualEmpty" hidden>Add planned amounts to compare against actual expenses.</p></div>
+        </section>
+
         <section class="panel recent-panel" aria-labelledby="recentTitle">
           <div class="section-heading"><div><p class="eyebrow">LATEST ACTIVITY</p><h2 id="recentTitle">Recent expenses</h2></div><button class="text-button" type="button" data-go="expenseRecords">All records <span aria-hidden="true">→</span></button></div>
           <div class="recent-list" id="recentExpenses"></div>
         </section>
+      </section>
+
+      <section class="page" id="expensePlan" aria-labelledby="planTitle" hidden>
+        <div class="page-intro"><p class="eyebrow">BUDGET BEFORE BOOKING</p><h2 id="planTitle">Category plan</h2><p>Set a target for each category and compare it with actual expenses.</p></div>
+        <div class="plan-layout">
+          <form class="panel plan-form" id="planForm">
+            <p class="eyebrow">PLANNED AMOUNT</p><h3 id="planFormTitle">Add a category plan</h3>
+            <div class="field"><label for="planCategory">Category</label><select id="planCategory" required></select></div>
+            <div class="field"><label for="planAmount">Amount</label><div class="amount-input"><span>₹</span><input id="planAmount" type="number" min="0.01" step="0.01" placeholder="0.00" required></div></div>
+            <div class="plan-form-actions"><button class="primary-button" id="planSubmit" type="submit">Add plan</button><button class="secondary-button" id="cancelPlanEdit" type="button" hidden>Cancel edit</button></div>
+          </form>
+          <section class="panel plans-table-panel" aria-labelledby="plansTableTitle">
+            <div class="section-heading"><div><p class="eyebrow">CATEGORY TARGETS</p><h2 id="plansTableTitle">Planned expenses</h2></div><span class="count-pill" id="planCount">0</span></div>
+            <div class="table-wrap" id="plansTableWrap"><table id="planTable"><thead><tr><th>Category</th><th class="amount-col">Amount</th><th id="planActionsHeader">Actions</th></tr></thead><tbody id="planTableBody"></tbody><tfoot><tr><th>Total planned</th><td class="amount-col" id="plannedTotal">₹0</td><td></td></tr></tfoot></table></div>
+            <div class="empty-state" id="plansEmpty" hidden><p>No categories have planned amounts yet.</p></div>
+          </section>
+        </div>
       </section>
 
       <section class="page" id="addExpense" aria-labelledby="addTitle" hidden>

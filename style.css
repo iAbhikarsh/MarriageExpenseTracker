@@ -152,6 +152,14 @@ td.actions { width: 92px; text-align: right; white-space: nowrap; }
 .empty-state > span { color: #c3ab7c; font-size: 24px; }
 .empty-state p { font-size: 12px; }
 .category-layout { display: grid; grid-template-columns: minmax(230px, .8fr) minmax(0, 1.4fr); align-items: start; gap: 16px; }
+.plan-layout { display: grid; grid-template-columns: minmax(230px, .7fr) minmax(0, 1.3fr); align-items: start; gap: 16px; }
+.plan-form, .plans-table-panel { padding: 22px; }
+.plan-form h3 { margin: 0 0 19px; font-family: var(--serif); font-size: 19px; font-weight: 500; }
+.plan-form .field { margin-bottom: 17px; }
+.plan-form-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 19px; }
+.plan-chart-panel { margin-bottom: 15px; padding: 21px; }
+.planned-chart-wrap { position: relative; height: 300px; margin-top: 16px; }
+.plans-table-panel tfoot th, .plans-table-panel tfoot td { border-top: 2px solid var(--line); color: var(--ink); font-size: 12px; font-weight: 700; }
 .category-form, .category-list-panel { padding: 22px; }
 .category-form h3 { margin: 0 0 19px; font-family: var(--serif); font-size: 19px; font-weight: 500; }
 .category-form input { margin-bottom: 10px; }
@@ -210,7 +218,9 @@ td.actions { width: 92px; text-align: right; white-space: nowrap; }
   .stat-grid { grid-template-columns: 1fr; gap: 8px; }
   .stat-card { min-height: 90px; padding: 13px 15px; }
   .stat-card strong { margin: 5px 0 2px; font-size: 21px; }
-  .dashboard-grid, .category-layout { grid-template-columns: 1fr; }
+  .dashboard-grid, .category-layout, .plan-layout { grid-template-columns: 1fr; }
+  .plan-chart-panel { padding: 17px; }
+  .planned-chart-wrap { height: 255px; }
   .budget-panel, .category-panel, .recent-panel { padding: 17px; }
   .category-panel { min-height: 195px; }
   .form-grid { grid-template-columns: 1fr; gap: 16px; }
