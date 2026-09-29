@@ -40,6 +40,9 @@ button { cursor: pointer; }
 .topbar-actions, .auth-controls { display: flex; align-items: center; gap: 12px; }
 .auth-controls { gap: 9px; }
 .auth-user { max-width: 190px; overflow: hidden; color: #68736c; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.auth-role { padding: 4px 8px; border-radius: 3px; background: #edf0e9; color: var(--green); font-size: 10px; font-weight: 700; }
+.auth-role { padding: 4px 8px; border-radius: 3px; background: #edf0e9; color: var(--green); font-size: 10px; font-weight: 700; }
+.verification-link { margin-top: 12px; }
 .auth-screen { display: grid; min-height: 100vh; min-height: 100svh; place-items: center; padding: 24px; background: linear-gradient(135deg, #edf0e8 0%, #f4f2ec 54%, #ecece5 100%); }
 .auth-panel { width: min(100%, 420px); padding: 36px; border: 1px solid #e1e2d9; border-top: 4px solid var(--green); border-radius: 4px; background: var(--paper); box-shadow: 0 18px 48px #244a3b14; }
 .auth-brand { margin: 0 0 35px; color: var(--ink); }

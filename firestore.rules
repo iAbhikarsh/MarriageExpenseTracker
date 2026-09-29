@@ -1,33 +1,43 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isMarriageTrackerUser() {
-      return request.auth != null
-        && request.auth.uid in [
-          'REPLACE_WITH_FIRST_ALLOWED_UID'
-        ];
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasTrackerAccess() {
+      let profilePath = /databases/$(database)/documents/marriage_users/$(request.auth.uid);
+      return isSignedIn()
+        && request.auth.token.email_verified == true
+        && exists(profilePath)
+        && get(profilePath).data.email == request.auth.token.email
+        && get(profilePath).data.role in ['reader', 'editor'];
+    }
+
+    function isEditor() {
+      let profilePath = /databases/$(database)/documents/marriage_users/$(request.auth.uid);
+      return hasTrackerAccess()
+        && get(profilePath).data.role == 'editor';
     }
 
     match /marriage_expenses/{documentId} {
-      allow read, write: if isMarriageTrackerUser();
+      allow read: if hasTrackerAccess();
+      allow write: if isEditor();
     }
 
     match /marriage_categories/{documentId} {
-      allow read, write: if isMarriageTrackerUser();
+      allow read: if hasTrackerAccess();
+      allow write: if isEditor();
     }
 
     match /marriage_settings/{documentId} {
-      allow read, write: if isMarriageTrackerUser();
+      allow read: if hasTrackerAccess();
+      allow write: if isEditor();
     }
 
     match /marriage_users/{userId} {
-      allow read: if isMarriageTrackerUser() && request.auth.uid == userId;
-      allow create: if isMarriageTrackerUser()
-        && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['username', 'email', 'createdAt'])
-        && request.resource.data.username == request.auth.token.email
-        && request.resource.data.email == request.auth.token.email;
-      allow update, delete: if false;
+      allow get: if isSignedIn() && request.auth.uid == userId;
+      allow list, create, update, delete: if false;
     }
   }
 }

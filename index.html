@@ -10,7 +10,7 @@
   <script src="https://www.gstatic.com/firebasejs/10.6.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.6.0/firebase-firestore-compat.js"></script>
   <script src="firebase-config.js"></script>
-  <script src="script.js?v=expense-save-2" defer></script>
+  <script src="script.js?v=reader-editor-1" defer></script>
 </head>
 <body>
   <main class="auth-screen" id="authScreen">
@@ -30,6 +30,7 @@
         <button class="text-button" id="switchAuthMode" type="button">Create an account</button>
         <button class="text-button" id="passwordReset" type="button">Forgot password?</button>
       </div>
+      <button class="text-button verification-link" id="sendVerificationButton" type="button" hidden>Resend verification email</button>
       <button class="secondary-button auth-signout" id="authSignOutButton" type="button" hidden>Sign out</button>
     </section>
   </main>
@@ -60,6 +61,7 @@
         <div class="topbar-actions">
           <div class="auth-controls" aria-label="Account">
             <span class="auth-user" id="authUser" hidden></span>
+            <span class="auth-role" id="authRole" hidden></span>
             <button class="text-button" id="signOutButton" type="button" hidden>Sign out</button>
           </div>
           <button class="primary-button top-add" type="button" data-go="addExpense"><span aria-hidden="true">＋</span> Add expense</button>
@@ -132,7 +134,7 @@
             <button class="text-button clear-filters" id="clearFilters" type="button">Clear filters</button>
             <span class="record-total" id="filteredTotal">₹0 total</span>
           </div>
-          <div class="table-wrap"><table id="expenseTable"><thead><tr><th>Date</th><th>Expense</th><th>Category</th><th>Note</th><th class="amount-col">Amount</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody></tbody></table></div>
+          <div class="table-wrap"><table id="expenseTable"><thead><tr><th>Date</th><th>Expense</th><th>Category</th><th>Note</th><th class="amount-col">Amount</th><th id="expenseActionsHeader"><span class="sr-only">Actions</span></th></tr></thead><tbody></tbody></table></div>
           <div class="empty-state" id="recordsEmpty" hidden><span aria-hidden="true">✳</span><p>No expenses match yet.</p><button class="text-button" type="button" data-go="addExpense">Add your first expense →</button></div>
         </section>
       </section>

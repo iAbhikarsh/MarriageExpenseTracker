@@ -13,6 +13,8 @@ let expenses = [];
 let budget = 0;
 let firebaseReady = false;
 let currentUser = null;
+let currentUserProfile = null;
+let canEditData = false;
 let authMode = 'signIn';
 let toastTimer;
 
@@ -37,12 +39,15 @@ const elements = {
   categoryList: document.getElementById('categoryList'),
   categoryCount: document.getElementById('categoryCount'),
   expenseTableBody: document.querySelector('#expenseTable tbody'),
+  expenseActionsHeader: document.getElementById('expenseActionsHeader'),
   recordsEmpty: document.getElementById('recordsEmpty'),
   filteredTotal: document.getElementById('filteredTotal'),
   authScreen: document.getElementById('authScreen'),
   appShell: document.getElementById('appShell'),
   authSignOutButton: document.getElementById('authSignOutButton'),
+  sendVerificationButton: document.getElementById('sendVerificationButton'),
   authUser: document.getElementById('authUser'),
+  authRole: document.getElementById('authRole'),
   signOutButton: document.getElementById('signOutButton'),
   authMessage: document.getElementById('authMessage'),
   authEmail: document.getElementById('authEmail'),
@@ -62,9 +67,10 @@ function showFirebaseError(error, action = 'Firebase request failed') {
     elements.authScreen.hidden = false;
     elements.appShell.hidden = true;
     elements.authSignOutButton.hidden = false;
+    elements.sendVerificationButton.hidden = currentUser.emailVerified;
     elements.authMessage.textContent = error.code === 'permission-denied'
-      ? `This account does not have tracker access yet. Add UID ${currentUser.uid} to the marriage rules, publish them, then sign in again.`
-      : 'Could not load your tracker. Check the Firestore database and its rules, then try signing in again.';
+      ? 'Your tracker profile is missing or invalid. Ask an admin to provision your email as a reader or editor.'
+      : 'Could not load your tracker profile or data. Check your account setup and Firestore rules.';
     return;
   }
   const code = error && error.code ? ` (${error.code})` : '';
@@ -96,49 +102,71 @@ function showAuthMode(mode) {
     : 'Sign in with your email address and password.';
 }
 
+function showAccessMessage(message) {
+  elements.authScreen.hidden = false;
+  elements.appShell.hidden = true;
+  elements.authSignOutButton.hidden = !currentUser;
+  elements.sendVerificationButton.hidden = !currentUser || currentUser.emailVerified;
+  elements.authMessage.textContent = message;
+}
+
 async function loadTrackerData() {
   if (!db) {
-    elements.authMessage.textContent = 'Firebase is not initialized. Check the SDKs and Firebase config.';
+    showAccessMessage('Firebase is not initialized. Check the SDKs and Firebase config.');
     return;
   }
   if (!currentUser) return;
 
   firebaseReady = false;
   elements.authMessage.textContent = 'Checking your account access...';
-  const userRef = userCollection.doc(currentUser.uid);
-  const budgetRef = settingsCollection.doc('budget');
+  if (!currentUser.emailVerified) {
+    canEditData = false;
+    showAccessMessage('Verify your email address before accessing the tracker.');
+    return;
+  }
+
   try {
-    const [userSnapshot, budgetSnapshot, categorySnapshot, expenseSnapshot] = await Promise.all([
-      userRef.get(),
+    const userSnapshot = await userCollection.doc(currentUser.uid).get();
+    if (!userSnapshot.exists) {
+      currentUserProfile = null;
+      canEditData = false;
+      showAccessMessage(`Your account is not provisioned yet. Ask an admin to create marriage_users/${currentUser.uid} with role reader or editor.`);
+      return;
+    }
+
+    currentUserProfile = userSnapshot.data();
+    if (currentUserProfile.email !== currentUser.email || !['reader', 'editor'].includes(currentUserProfile.role)) {
+      canEditData = false;
+      showAccessMessage('Your tracker profile is invalid. Ask an admin to check your email and reader/editor role.');
+      return;
+    }
+
+    canEditData = currentUserProfile.role === 'editor';
+    const budgetRef = settingsCollection.doc('budget');
+    const [budgetSnapshot, categorySnapshot, expenseSnapshot] = await Promise.all([
       budgetRef.get(),
       categoryCollection.get(),
       expenseCollection.get()
     ]);
 
-    if (!userSnapshot.exists) {
-      await userRef.set({
-        username: currentUser.email,
-        email: currentUser.email,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-    }
-
     if (categorySnapshot.empty) {
-      const batch = db.batch();
-      DEFAULT_CATEGORIES.forEach(name => {
-        batch.set(categoryCollection.doc(categoryDocumentId(name)), {
-          name,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      if (canEditData) {
+        const batch = db.batch();
+        DEFAULT_CATEGORIES.forEach(name => {
+          batch.set(categoryCollection.doc(categoryDocumentId(name)), {
+            name,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
         });
-      });
-      await batch.commit();
+        await batch.commit();
+      }
       categories = [...DEFAULT_CATEGORIES];
     } else {
       categories = categorySnapshot.docs.map(categoryDocument => categoryDocument.data().name).filter(Boolean);
     }
 
-    if (!budgetSnapshot.exists) await budgetRef.set({ amount: 0 });
-    if (!expenseSnapshot.docs.some(expenseDocument => expenseDocument.id === '_metadata')) {
+    if (!budgetSnapshot.exists && canEditData) await budgetRef.set({ amount: 0 });
+    if (canEditData && !expenseSnapshot.docs.some(expenseDocument => expenseDocument.id === '_metadata')) {
       await expenseCollection.doc('_metadata').set({ purpose: 'Marriage expense records' });
     }
 
@@ -158,10 +186,16 @@ async function loadTrackerData() {
         };
       });
     firebaseReady = true;
+    elements.authRole.hidden = false;
+    elements.authRole.textContent = canEditData ? 'Editor' : 'Read only';
+    applyAccessControls();
     refresh();
     elements.authScreen.hidden = true;
     elements.appShell.hidden = false;
     elements.signOutButton.hidden = false;
+    if (!canEditData && (!budgetSnapshot.exists || categorySnapshot.empty)) {
+      showToast('Some tracker setup is pending an editor account.');
+    }
   } catch (error) {
     showFirebaseError(error);
   }
@@ -191,6 +225,10 @@ function showToast(message) {
 }
 
 function showPage(pageId) {
+  if (!canEditData && pageId === 'addExpense') {
+    showToast('Your account has read-only access.');
+    return;
+  }
   pages.forEach(id => {
     const page = document.getElementById(id);
     const active = id === pageId;
@@ -244,7 +282,8 @@ function renderCategoryOptions() {
     remove.textContent = 'Remove';
     remove.setAttribute('aria-label', `Remove ${category} category`);
     const isUsed = expenses.some(expense => expense.category === category);
-    remove.disabled = isUsed;
+    remove.hidden = !canEditData;
+    remove.disabled = isUsed || !canEditData;
     remove.title = isUsed ? 'This category is used by an expense' : `Remove ${category}`;
     remove.addEventListener('click', () => removeCategory(category));
     item.append(name, remove);
@@ -358,24 +397,40 @@ function renderRecords() {
     row.append(amount);
     const actions = document.createElement('td');
     actions.className = 'actions';
-    const edit = document.createElement('button');
-    edit.type = 'button';
-    edit.className = 'row-action';
-    edit.textContent = 'Edit';
-    edit.addEventListener('click', () => openEdit(expense));
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'row-action delete';
-    remove.textContent = 'Delete';
-    remove.addEventListener('click', () => deleteExpense(expense.id));
-    actions.append(edit, remove);
+    if (canEditData) {
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'row-action';
+      edit.textContent = 'Edit';
+      edit.addEventListener('click', () => openEdit(expense));
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'row-action delete';
+      remove.textContent = 'Delete';
+      remove.addEventListener('click', () => deleteExpense(expense.id));
+      actions.append(edit, remove);
+    } else {
+      actions.hidden = true;
+    }
     row.append(actions);
     elements.expenseTableBody.append(row);
   });
+  elements.expenseActionsHeader.hidden = !canEditData;
   elements.recordsEmpty.hidden = records.length > 0;
   document.querySelector('.table-wrap').hidden = records.length === 0;
   const total = records.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
   elements.filteredTotal.textContent = `${formatMoney(total)} total`;
+}
+
+function applyAccessControls() {
+  document.querySelectorAll('[data-page="addExpense"], [data-go="addExpense"]').forEach(control => {
+    control.hidden = !canEditData;
+  });
+  document.getElementById('budgetForm').hidden = !canEditData;
+  document.getElementById('categoryForm').hidden = !canEditData;
+  elements.expenseActionsHeader.hidden = !canEditData;
+  elements.authRole.hidden = !currentUserProfile;
+  elements.authRole.textContent = canEditData ? 'Editor' : 'Read only';
 }
 
 function refresh() {
@@ -386,6 +441,7 @@ function refresh() {
 }
 
 function openEdit(expense) {
+  if (!canEditData) return showToast('Your account has read-only access.');
   document.getElementById('editId').value = expense.id;
   document.getElementById('editDate').value = expense.date;
   document.getElementById('editName').value = expense.name;
@@ -396,6 +452,7 @@ function openEdit(expense) {
 }
 
 async function deleteExpense(id) {
+  if (!canEditData) return showToast('Your account has read-only access.');
   if (!window.confirm('Delete this expense record?')) return;
   try {
     await expenseCollection.doc(id).delete();
@@ -408,6 +465,7 @@ async function deleteExpense(id) {
 }
 
 async function removeCategory(category) {
+  if (!canEditData) return showToast('Your account has read-only access.');
   if (expenses.some(expense => expense.category === category)) {
     showToast('Remove or recategorize its expenses first.');
     return;
@@ -428,6 +486,7 @@ document.querySelectorAll('[data-go]').forEach(button => button.addEventListener
 
 document.getElementById('budgetForm').addEventListener('submit', async event => {
   event.preventDefault();
+  if (!canEditData) return showToast('Your account has read-only access.');
   if (!firebaseReady) return showToast('Waiting for the Firebase connection.');
   const nextBudget = Number(elements.budgetInput.value);
   if (!Number.isFinite(nextBudget) || nextBudget < 0) return;
@@ -444,6 +503,7 @@ document.getElementById('budgetForm').addEventListener('submit', async event => 
 document.getElementById('expenseForm').addEventListener('submit', async event => {
   event.preventDefault();
   const expenseForm = event.currentTarget;
+  if (!canEditData) return showToast('Your account has read-only access.');
   if (!firebaseReady) return showToast('Waiting for the Firebase connection.');
   const expense = {
     date: document.getElementById('date').value,
@@ -468,6 +528,7 @@ document.getElementById('expenseForm').addEventListener('submit', async event =>
 
 document.getElementById('categoryForm').addEventListener('submit', async event => {
   event.preventDefault();
+  if (!canEditData) return showToast('Your account has read-only access.');
   if (!firebaseReady) return showToast('Waiting for the Firebase connection.');
   const input = document.getElementById('newCategory');
   const value = input.value.trim();
@@ -493,6 +554,7 @@ document.getElementById('categoryForm').addEventListener('submit', async event =
 
 document.getElementById('editForm').addEventListener('submit', async event => {
   event.preventDefault();
+  if (!canEditData) return showToast('Your account has read-only access.');
   if (!firebaseReady) return showToast('Waiting for the Firebase connection.');
   const id = document.getElementById('editId').value;
   const updatedExpense = {
@@ -529,8 +591,13 @@ document.getElementById('emailAuthForm').addEventListener('submit', async event 
   const email = elements.authEmail.value.trim();
   const password = elements.authPassword.value;
   try {
-    if (authMode === 'create') await auth.createUserWithEmailAndPassword(email, password);
-    else await auth.signInWithEmailAndPassword(email, password);
+    if (authMode === 'create') {
+      const credential = await auth.createUserWithEmailAndPassword(email, password);
+      await credential.user.sendEmailVerification();
+      elements.authMessage.textContent = 'Verification email sent. Verify your address, then sign in again.';
+    } else {
+      await auth.signInWithEmailAndPassword(email, password);
+    }
     elements.authPassword.value = '';
   } catch (error) {
     elements.authMessage.textContent = emailAuthErrorMessage(error);
@@ -551,6 +618,16 @@ document.getElementById('passwordReset').addEventListener('click', async () => {
   try {
     await auth.sendPasswordResetEmail(email);
     elements.authMessage.textContent = 'Password reset email sent. Check your inbox.';
+  } catch (error) {
+    elements.authMessage.textContent = emailAuthErrorMessage(error);
+  }
+});
+
+elements.sendVerificationButton.addEventListener('click', async () => {
+  if (!currentUser) return;
+  try {
+    await currentUser.sendEmailVerification();
+    elements.authMessage.textContent = 'Verification email sent. Verify your address, then sign out and back in.';
   } catch (error) {
     elements.authMessage.textContent = emailAuthErrorMessage(error);
   }
@@ -581,15 +658,18 @@ if (!auth) {
 } else {
   auth.onAuthStateChanged(user => {
     currentUser = user;
+    currentUserProfile = null;
+    canEditData = false;
     firebaseReady = false;
     elements.authScreen.hidden = false;
     elements.appShell.hidden = true;
     elements.authSignOutButton.hidden = !user;
+    elements.sendVerificationButton.hidden = !user || user.emailVerified;
     elements.authUser.hidden = !user;
     elements.authUser.textContent = user ? user.email || 'Signed in' : '';
+    elements.authRole.hidden = true;
 
     if (user) {
-      elements.authMessage.textContent = 'Checking your account access...';
       loadTrackerData();
       return;
     }
@@ -598,6 +678,7 @@ if (!auth) {
     expenses = [];
     budget = 0;
     elements.authMessage.textContent = 'Sign in with an approved account to load your tracker.';
+    applyAccessControls();
     refresh();
   }, showFirebaseError);
 }
