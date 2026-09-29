@@ -39,7 +39,6 @@ const elements = {
   expenseTableBody: document.querySelector('#expenseTable tbody'),
   recordsEmpty: document.getElementById('recordsEmpty'),
   filteredTotal: document.getElementById('filteredTotal'),
-  firebaseStatus: document.getElementById('firebaseStatus'),
   authScreen: document.getElementById('authScreen'),
   appShell: document.getElementById('appShell'),
   authSignOutButton: document.getElementById('authSignOutButton'),
@@ -68,14 +67,10 @@ function showFirebaseError(error) {
       : 'Could not load your tracker. Check the Firestore database and its rules, then try signing in again.';
     return;
   }
-  elements.firebaseStatus.hidden = false;
-  elements.firebaseStatus.textContent = error.code === 'permission-denied' && currentUser
-    ? `Signed in, but Firestore rules do not allow UID ${currentUser.uid}. Add this UID to the marriage collection allowlist.`
-    : 'Firebase could not be accessed. Check that Firestore is enabled and its security rules allow this app to read and write the marriage collections.';
-}
-
-function clearFirebaseStatus() {
-  elements.firebaseStatus.hidden = true;
+  const message = error.code === 'permission-denied'
+    ? 'Firestore denied this action. Check the rules for the affected marriage collection.'
+    : 'Could not complete the Firebase action. Check your connection and try again.';
+  showToast(message);
 }
 
 function emailAuthErrorMessage(error) {
@@ -105,14 +100,13 @@ function showAuthMode(mode) {
 
 async function loadTrackerData() {
   if (!db) {
-    elements.firebaseStatus.textContent = 'Firebase is not initialized. Check that the Firebase SDKs and firebase-config.js loaded successfully.';
+    elements.authMessage.textContent = 'Firebase is not initialized. Check the SDKs and Firebase config.';
     return;
   }
   if (!currentUser) return;
 
   firebaseReady = false;
-  elements.firebaseStatus.hidden = false;
-  elements.firebaseStatus.textContent = 'Loading your marriage tracker...';
+  elements.authMessage.textContent = 'Checking your account access...';
   const userRef = userCollection.doc(currentUser.uid);
   const budgetRef = settingsCollection.doc('budget');
   try {
@@ -166,14 +160,12 @@ async function loadTrackerData() {
         };
       });
     firebaseReady = true;
-    elements.firebaseStatus.hidden = true;
     refresh();
     elements.authScreen.hidden = true;
     elements.appShell.hidden = false;
     elements.signOutButton.hidden = false;
   } catch (error) {
     showFirebaseError(error);
-    showToast('Marriage tracker could not connect to Firebase.');
   }
 }
 
@@ -197,7 +189,7 @@ function showToast(message) {
   elements.toast.textContent = message;
   elements.toast.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => elements.toast.classList.remove('show'), 2600);
+  toastTimer = setTimeout(() => elements.toast.classList.remove('show'), 3800);
 }
 
 function showPage(pageId) {
@@ -410,7 +402,6 @@ async function deleteExpense(id) {
   try {
     await expenseCollection.doc(id).delete();
     expenses = expenses.filter(expense => expense.id !== id);
-    clearFirebaseStatus();
     showToast('Expense deleted.');
   } catch (error) {
     showFirebaseError(error);
@@ -427,7 +418,6 @@ async function removeCategory(category) {
   try {
     await categoryCollection.doc(categoryDocumentId(category)).delete();
     categories = categories.filter(item => item !== category);
-    clearFirebaseStatus();
     showToast('Category removed.');
   } catch (error) {
     showFirebaseError(error);
@@ -446,7 +436,6 @@ document.getElementById('budgetForm').addEventListener('submit', async event => 
   try {
     await settingsCollection.doc('budget').set({ amount: nextBudget, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
     budget = nextBudget;
-    clearFirebaseStatus();
     showToast('Budget updated.');
     renderDashboard();
   } catch (error) {
@@ -468,10 +457,9 @@ document.getElementById('expenseForm').addEventListener('submit', async event =>
   try {
     const expenseDocument = await expenseCollection.add(expense);
     expenses = [...expenses, { ...expense, id: expenseDocument.id, createdAt: Date.now() }];
-    clearFirebaseStatus();
     event.currentTarget.reset();
     document.getElementById('date').value = localDateValue();
-    showToast('Expense added.');
+    showToast('Expense saved successfully.');
     showPage('dashboard');
     refresh();
   } catch (error) {
@@ -493,7 +481,6 @@ document.getElementById('categoryForm').addEventListener('submit', async event =
   try {
     await categoryCollection.doc(categoryDocumentId(value)).set({ name: value, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
     categories = [...categories, value];
-    clearFirebaseStatus();
     input.value = '';
     document.getElementById('categoryHint').textContent = 'Categories can be up to 40 characters.';
     showToast(`${value} category added.`);
@@ -519,7 +506,6 @@ document.getElementById('editForm').addEventListener('submit', async event => {
   try {
     await expenseCollection.doc(id).update(updatedExpense);
     expenses = expenses.map(expense => expense.id === id ? { ...expense, ...updatedExpense } : expense);
-    clearFirebaseStatus();
     document.getElementById('editDialog').close();
     showToast('Expense updated.');
     refresh();
