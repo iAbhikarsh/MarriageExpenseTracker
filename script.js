@@ -460,6 +460,9 @@ function renderDashboard() {
       row.className = 'summary-row';
       const label = document.createElement('span');
       label.className = 'summary-name';
+      if (item.actual > item.planned) {
+        label.classList.add('summary-over');
+      }
       label.textContent = item.category;
       const bars = document.createElement('div');
       bars.className = 'summary-bars';
@@ -482,6 +485,9 @@ function renderDashboard() {
       plannedAmount.textContent = formatMoney(item.planned);
       const actualAmount = document.createElement('span');
       actualAmount.className = 'actual-amount';
+      if (item.actual > item.planned) {
+        actualAmount.classList.add('summary-over');
+      }
       actualAmount.textContent = formatMoney(item.actual);
       amounts.append(plannedAmount, actualAmount);
       row.setAttribute('aria-label', `${item.category}: planned ${formatMoney(item.planned)}, actual ${formatMoney(item.actual)}`);
