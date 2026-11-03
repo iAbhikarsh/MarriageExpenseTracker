@@ -446,17 +446,16 @@ function renderDashboard() {
     category,
     planned: plans.filter(plan => plan.category === category).reduce((sum, plan) => sum + plan.amount, 0),
     actual: expenses.filter(expense => expense.category === category).reduce((sum, expense) => sum + expense.amount, 0)
-  })).filter(item => item.planned > 0 || item.actual > 0)
-    .sort((a, b) => Math.max(b.planned, b.actual) - Math.max(a.planned, a.actual));
+  })).sort((a, b) => Math.max(b.planned, b.actual) - Math.max(a.planned, a.actual));
   elements.categorySummary.replaceChildren();
   if (!totals.length) {
     const empty = document.createElement('p');
     empty.className = 'summary-empty';
-    empty.textContent = 'Category comparisons will appear after you add a plan or expense.';
+    empty.textContent = 'No expense categories to display.';
     elements.categorySummary.append(empty);
   } else {
-    const max = Math.max(...totals.map(item => Math.max(item.planned, item.actual)));
-    totals.slice(0, 6).forEach(item => {
+    const max = Math.max(...totals.map(item => Math.max(item.planned, item.actual)), 1);
+    totals.forEach(item => {
       const row = document.createElement('div');
       row.className = 'summary-row';
       const label = document.createElement('span');
