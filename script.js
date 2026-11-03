@@ -39,6 +39,7 @@ const elements = {
   recentExpenses: document.getElementById('recentExpenses'),
   category: document.getElementById('category'),
   expenseFilter: document.getElementById('expenseFilter'),
+  expenseSearch: document.getElementById('expenseSearch'),
   editCategory: document.getElementById('editCategory'),
   categoryList: document.getElementById('categoryList'),
   categoryCount: document.getElementById('categoryCount'),
@@ -446,23 +447,22 @@ function renderDashboard() {
     category,
     planned: plans.filter(plan => plan.category === category).reduce((sum, plan) => sum + plan.amount, 0),
     actual: expenses.filter(expense => expense.category === category).reduce((sum, expense) => sum + expense.amount, 0)
-  })).sort((a, b) => Math.max(b.planned, b.actual) - Math.max(a.planned, a.actual));
+  })).filter(item => item.planned > 0 || item.actual > 0)
+    .sort((a, b) => Math.max(b.planned, b.actual) - Math.max(a.planned, a.actual));
   elements.categorySummary.replaceChildren();
   if (!totals.length) {
     const empty = document.createElement('p');
     empty.className = 'summary-empty';
-    empty.textContent = 'No expense categories to display.';
+    empty.textContent = 'Category comparisons will appear after you add a plan or expense.';
     elements.categorySummary.append(empty);
   } else {
-    const max = Math.max(...totals.map(item => Math.max(item.planned, item.actual)), 1);
-    totals.forEach(item => {
+    const max = Math.max(...totals.map(item => Math.max(item.planned, item.actual)));
+    totals.slice(0, 6).forEach(item => {
       const row = document.createElement('div');
       row.className = 'summary-row';
       const label = document.createElement('span');
       label.className = 'summary-name';
-      if (item.actual > item.planned) {
-        label.classList.add('summary-over');
-      }
+      if (item.actual > item.planned) label.classList.add('summary-over');
       label.textContent = item.category;
       const bars = document.createElement('div');
       bars.className = 'summary-bars';
@@ -485,9 +485,7 @@ function renderDashboard() {
       plannedAmount.textContent = formatMoney(item.planned);
       const actualAmount = document.createElement('span');
       actualAmount.className = 'actual-amount';
-      if (item.actual > item.planned) {
-        actualAmount.classList.add('summary-over');
-      }
+      if (item.actual > item.planned) actualAmount.classList.add('summary-over');
       actualAmount.textContent = formatMoney(item.actual);
       amounts.append(plannedAmount, actualAmount);
       row.setAttribute('aria-label', `${item.category}: planned ${formatMoney(item.planned)}, actual ${formatMoney(item.actual)}`);
@@ -595,9 +593,21 @@ function renderPlannedActualChart() {
 function renderRecords() {
   const selectedCategory = elements.expenseFilter.value;
   const selectedDate = document.getElementById('dateFilter').value;
+  const searchText = (elements.expenseSearch.value || '').trim().toLowerCase();
   const records = [...expenses]
     .filter(expense => selectedCategory === 'all' || !selectedCategory || expense.category === selectedCategory)
     .filter(expense => !selectedDate || expense.date === selectedDate)
+    .filter(expense => {
+      if (!searchText) return true;
+      const searchableText = [
+        expense.name,
+        expense.category,
+        expense.notes,
+        String(expense.amount),
+        formatMoney(expense.amount)
+      ].join(' ').toLowerCase();
+      return searchableText.includes(searchText);
+    })
     .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
   elements.expenseTableBody.replaceChildren();
   records.forEach(expense => {
@@ -839,9 +849,11 @@ document.getElementById('editForm').addEventListener('submit', async event => {
 document.getElementById('closeDialog').addEventListener('click', () => document.getElementById('editDialog').close());
 document.getElementById('cancelEdit').addEventListener('click', () => document.getElementById('editDialog').close());
 elements.expenseFilter.addEventListener('change', renderRecords);
+elements.expenseSearch.addEventListener('input', renderRecords);
 document.getElementById('dateFilter').addEventListener('change', renderRecords);
 document.getElementById('clearFilters').addEventListener('click', () => {
   elements.expenseFilter.value = 'all';
+  elements.expenseSearch.value = '';
   document.getElementById('dateFilter').value = '';
   renderRecords();
 });
