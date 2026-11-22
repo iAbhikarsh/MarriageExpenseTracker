@@ -457,8 +457,9 @@ function renderDashboard() {
   } else {
     const max = Math.max(...totals.map(item => Math.max(item.planned, item.actual)));
     totals.forEach(item => {
+      const overBudget = item.planned > 0 && item.actual > item.planned;
       const row = document.createElement('div');
-      row.className = 'summary-row';
+      row.className = `summary-row${overBudget ? ' over-budget' : ''}`;
       const label = document.createElement('span');
       label.className = 'summary-name';
       label.textContent = item.category;
@@ -482,10 +483,10 @@ function renderDashboard() {
       plannedAmount.className = 'planned-amount';
       plannedAmount.textContent = formatMoney(item.planned);
       const actualAmount = document.createElement('span');
-      actualAmount.className = 'actual-amount';
+      actualAmount.className = `actual-amount${overBudget ? ' over-budget' : ''}`;
       actualAmount.textContent = formatMoney(item.actual);
       amounts.append(plannedAmount, actualAmount);
-      row.setAttribute('aria-label', `${item.category}: planned ${formatMoney(item.planned)}, actual ${formatMoney(item.actual)}`);
+      row.setAttribute('aria-label', `${item.category}: planned ${formatMoney(item.planned)}, actual ${formatMoney(item.actual)}${overBudget ? ', over planned budget' : ''}`);
       row.append(label, bars, amounts);
       elements.categorySummary.append(row);
     });
